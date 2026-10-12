@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 // Normal-mode interaction test against the browser (WASM) engine: panel DMA
 // scanning, both engines' pad LEDs and outputs, per-track mode toggling with
-// SHIFT+track, transport, LFO destinations, MIDI note and CC output,
-// settings commit and persistence.
+// SHIFT+track, transport, LFO destinations, MIDI note and CC output, the
+// full project lifecycle over the 64 documented saved-project slots
+// (PROJECT-001..004, covering both engine modes), settings commit and
+// persistence.
 //
 // Usage: node tools/browser_panel_test.mjs [path/to/emulator/web] [image.vsb]
 import {readFileSync} from 'node:fs';
@@ -175,6 +177,97 @@ press('gate'); // toggle back off
 run(400000);
 check(outputLevels(machine.board).Agate === 0, 'gate off after destination cleared');
 
+// --- Project management (PROJECT-001..004) --------------------------------
+// Slot n's record lives in the first bytes of SPI 0xC0000 + n * 0x3D000. The
+// workspace here is distinct in both engine modes: A is an LFO on the
+// reassigned CC, B a sequencer lane at 5 pulses.
+const slotBytes = (m, slot, n = 64) => {
+  const base = 0xc0000 + slot * 0x3d000;
+  return Array.from(m.board.flash.data.slice(base, base + n));
+};
+const settingsSector = m => Array.from(m.board.flash.data.slice(0x40000, 0x41000)).join();
+const hold = (control, down) => { machine.event({type: 'button', control, down}); run(400000); };
+const bLit = m => Array.from({length: 16}, (_, i) => m.board.panel.leds['B' + (i + 1)] > 128).filter(Boolean).length;
+
+press('project'); // enter the project manager
+run(400000);
+check(machine.board.panel.leds.project > 128, 'PROJECT LED lit in project mode');
+
+// PROJECT-003: SHIFT+pad saves the workspace to slot A1 only.
+const settingsBefore = settingsSector(machine);
+hold('shift', true);
+press('A1');
+hold('shift', false);
+const a1 = slotBytes(machine, 0);
+check(a1[0] === 0x41 && a1[1] === 0x47 && a1[2] === 0x50 && a1[3] === 0x31,
+  'save wrote a project record to slot A1 (magic AGP1)');
+check(a1[8] === 1 && a1[9] === 0, 'saved record carries the mixed engine modes (A LFO, B sequencer)');
+check(slotBytes(machine, 1).every(b => b === 0xff), 'save left neighbor slot A2 untouched');
+check(settingsSector(machine) === settingsBefore, 'save left the settings sector untouched');
+
+// PROJECT-001: SHIFT+PROJECT starts a new default project in the workspace
+// without touching any saved slot or the flash.
+const writesBeforeNew = machine.board.flash.writes;
+const a1Saved = slotBytes(machine, 0).join();
+hold('shift', true);
+press('project');
+hold('shift', false);
+check(machine.board.flash.writes === writesBeforeNew, 'new project performed no flash writes');
+check(slotBytes(machine, 0).join() === a1Saved, 'new project left saved slot A1 untouched');
+press('project'); // leave the manager to observe the workspace
+run(1000000);
+check(bLit(machine) === 3, `new project restored declared defaults (track B at E(3,16), got ${bLit(machine)})`);
+check(machine.board.panel.leds.A1 > 128 && machine.board.panel.leds.A2 < 64,
+  'new project restored track A as the default sequencer lane');
+
+// PROJECT-002: loading slot A1 reproduces the saved workspace exactly, in
+// both engine modes: B back at 5 pulses, A back to an LFO streaming its CC.
+press('project');
+press('A1');
+press('project');
+run(1000000);
+check(bLit(machine) === 5, 'loading slot A1 restored the sequencer edit (track B at 5 pulses)');
+const loadMark = midi.length;
+run(4000000);
+check(midi.slice(loadMark).some(m => (m[0] & 0xff) === 0xb0 && m[1] === assignedCC),
+  `loading slot A1 restored track A as an LFO on CC ${assignedCC}`);
+
+// PROJECT-002: an empty slot is reported without changing the workspace.
+press('project');
+press('C5');
+press('project');
+run(400000);
+check(bLit(machine) === 5, 'empty-slot load left the workspace unchanged');
+
+// PROJECT-002: a corrupted record is rejected without changing the workspace.
+machine.board.flash.data[0xc0000] ^= 0xff;
+press('project');
+press('A1');
+press('project');
+run(400000);
+check(bLit(machine) === 5, 'invalid-slot load left the workspace unchanged');
+
+// PROJECT-004: RECORD+pad deletes exactly one slot, observably empty after.
+press('project');
+hold('shift', true); // repopulate A1 first (over the corrupted record)
+press('A1');
+hold('shift', false);
+hold('record', true);
+press('A1');
+hold('record', false);
+check(slotBytes(machine, 0, 4096).every(b => b === 0xff), 'deleted slot A1 is observably empty');
+press('A1'); // a load attempt now reports empty and changes nothing
+
+// Save to the last slot D16 (63) for the cold-restart persistence check.
+hold('shift', true);
+press('D16');
+hold('shift', false);
+check(slotBytes(machine, 63)[0] === 0x41, 'project saved to last slot D16');
+press('project'); // leave the project manager
+run(400000);
+check(machine.board.panel.leds.project < 64, 'PROJECT LED off after leaving project mode');
+check(bLit(machine) === 5, 'deleted-slot load left the workspace unchanged');
+
 // Commit with GLOBAL, then power off and verify the hold release.
 const writesBefore = machine.board.flash.writes;
 press('global');
@@ -191,13 +284,37 @@ const savedSpi = machine.board.flash.data.slice();
 const midi2 = [];
 const machine2 = new Machine(engine, await loadImage(new Uint8Array(readFileSync(imagePath))), {onMidi: m => midi2.push(Array.from(m))});
 machine2.board.flash.data.set(savedSpi);
-let n = 6000000;
-while (n > 0) { const r = machine2.run(200000); if (r.error) throw Error(r.error); n -= 200000; }
+const run2 = n => {
+  while (n > 0) { const r = machine2.run(200000); if (r.error) throw Error(r.error); n -= 200000; }
+};
+run2(6000000);
 check(machine2.board.panel.leds.trackA > 128, 'committed selection (track A) restored after restart');
 check(midi2.some(m => (m[0] & 0xff) === 0xb0 && m[1] === assignedCC),
   `committed mode and CC (A as LFO on CC ${assignedCC}) restored after restart`);
 const restoredB = Array.from({length: 16}, (_, i) => machine2.board.panel.leds['B' + (i + 1)] > 128).filter(Boolean).length;
 check(restoredB === 5, `committed sequencer edit restored after restart (track B, ${restoredB} pulses)`);
+
+// Saved projects persist across the cold restart: reset the workspace to the
+// defaults (B back to 3 pulses), then load slot D16 to bring back the mixed
+// workspace that was saved before the shutdown.
+const press2 = control => {
+  machine2.event({type: 'button', control, down: true}); run2(400000);
+  machine2.event({type: 'button', control, down: false}); run2(400000);
+};
+const bLit2 = () => Array.from({length: 16}, (_, i) => machine2.board.panel.leds['B' + (i + 1)] > 128).filter(Boolean).length;
+machine2.event({type: 'button', control: 'shift', down: true}); run2(400000);
+press2('project');
+machine2.event({type: 'button', control: 'shift', down: false}); run2(400000);
+check(bLit2() === 3, `new project after restart reset track B to the default (got ${bLit2()})`);
+press2('project');
+press2('D16');
+press2('project');
+run2(1000000);
+check(bLit2() === 5, 'project in last slot D16 reloads after the cold restart');
+const mark2 = midi2.length;
+run2(4000000);
+check(midi2.slice(mark2).some(m => (m[0] & 0xff) === 0xb0 && m[1] === assignedCC),
+  'reloaded project restored both engine modes (A as LFO streaming again)');
 machine2.close();
 
 machine.close();

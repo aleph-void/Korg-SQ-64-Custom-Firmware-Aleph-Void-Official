@@ -1,0 +1,21 @@
+{
+  "format": "sq64-ui-script",
+  "version": 1,
+  "name": "AV aggregate 01: transport with mixed engines",
+  "actions": [
+    {"type": "power-on", "mode": "normal"},
+    {"type": "wait", "ms": 20000},
+    {"type": "press", "control": "play", "ms": 150},
+    {"type": "wait", "ms": 6000},
+    {"type": "press", "control": "tap", "ms": 120},
+    {"type": "wait", "ms": 300},
+    {"type": "press", "control": "tap", "ms": 120},
+    {"type": "wait", "ms": 300},
+    {"type": "press", "control": "tap", "ms": 120},
+    {"type": "wait", "ms": 300},
+    {"type": "press", "control": "tap", "ms": 120},
+    {"type": "wait", "ms": 5000},
+    {"type": "press", "control": "stop", "ms": 150},
+    {"type": "wait", "ms": 1000}
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "format": "sq64-ui-script",
+  "version": 1,
+  "name": "AV aggregate 07: GLOBAL save and persistence across power cycles",
+  "actions": [
+    {"type": "power-on", "mode": "normal"},
+    {"type": "wait", "ms": 20000},
+    {"type": "press", "control": "trackB", "ms": 150},
+    {"type": "wait", "ms": 500},
+    {"type": "press", "control": "B5", "ms": 150},
+    {"type": "wait", "ms": 2000},
+    {"type": "button", "control": "shift", "down": true},
+    {"type": "press", "control": "trackC", "ms": 150},
+    {"type": "button", "control": "shift", "down": false},
+    {"type": "wait", "ms": 2000},
+    {"type": "press", "control": "global", "ms": 150},
+    {"type": "wait", "ms": 2000},
+    {"type": "power-off"},
+    {"type": "wait", "ms": 3000},
+    {"type": "power-on", "mode": "normal"},
+    {"type": "wait", "ms": 20000}
+  ]
+}

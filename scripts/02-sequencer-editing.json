@@ -1,0 +1,25 @@
+{
+  "format": "sq64-ui-script",
+  "version": 1,
+  "name": "AV aggregate 02: Euclidean editing on tracks A/B",
+  "actions": [
+    {"type": "power-on", "mode": "normal"},
+    {"type": "wait", "ms": 20000},
+    {"type": "press", "control": "trackB", "ms": 150},
+    {"type": "wait", "ms": 1000},
+    {"type": "press", "control": "B9", "ms": 150},
+    {"type": "wait", "ms": 3000},
+    {"type": "button", "control": "shift", "down": true},
+    {"type": "press", "control": "B12", "ms": 150},
+    {"type": "button", "control": "shift", "down": false},
+    {"type": "wait", "ms": 3000},
+    {"type": "encoder", "control": "param3", "delta": 3},
+    {"type": "wait", "ms": 3000},
+    {"type": "encoder", "control": "param4", "delta": 12},
+    {"type": "wait", "ms": 3000},
+    {"type": "press", "control": "play", "ms": 150},
+    {"type": "wait", "ms": 6000},
+    {"type": "press", "control": "stop", "ms": 150},
+    {"type": "wait", "ms": 1000}
+  ]
+}

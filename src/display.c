@@ -119,18 +119,36 @@ void fb_clear(void)
     dirty = true;
 }
 
+static const uint8_t *glyph(unsigned c)
+{
+    if (c >= 'a' && c <= 'z') c -= 32;
+    if (c < FONT_FIRST || c - FONT_FIRST >= sizeof(font) / 5) c = ' ';
+    return font[c - FONT_FIRST];
+}
+
 void fb_text(int x, int y, const char *s, uint8_t level)
 {
     for (; *s; s++, x += 6) {
-        unsigned c = (unsigned char)*s;
-        if (c >= 'a' && c <= 'z') c -= 32;
-        if (c < FONT_FIRST || c - FONT_FIRST >= sizeof(font) / 5) c = ' ';
-        const uint8_t *g = font[c - FONT_FIRST];
+        const uint8_t *g = glyph((unsigned char)*s);
         for (int col = 0; col < 5; col++) {
             breathe(); /* glyphs are mostly dark: count the visit, not the ink */
             for (int row = 0; row < 7; row++)
                 if ((g[col] >> row) & 1)
                     fb_pixel(x + col, y + row, level);
+        }
+    }
+}
+
+/* Double-size text (each font pixel becomes a 2x2 block), for the splash. */
+void fb_text2x(int x, int y, const char *s, uint8_t level)
+{
+    for (; *s; s++, x += 12) {
+        const uint8_t *g = glyph((unsigned char)*s);
+        for (int col = 0; col < 5; col++) {
+            breathe();
+            for (int row = 0; row < 7; row++)
+                if ((g[col] >> row) & 1)
+                    fb_fill(x + col * 2, y + row * 2, 2, 2, level);
         }
     }
 }

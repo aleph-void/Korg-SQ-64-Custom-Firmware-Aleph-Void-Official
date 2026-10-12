@@ -13,6 +13,7 @@ void fb_clear(void);
 void fb_pixel(int x, int y, uint8_t level);         /* level 0..15 */
 void fb_fill(int x, int y, int w, int h, uint8_t level);
 void fb_text(int x, int y, const char *s, uint8_t level);
+void fb_text2x(int x, int y, const char *s, uint8_t level); /* 10x14 cells */
 void fb_number(int x, int y, int value, uint8_t level);
 void display_flush(void);  /* queue the framebuffer for DMA transfer */
 void display_pump(void);   /* start a queued transfer when DMA is idle */

@@ -703,6 +703,29 @@ static void update_leds(void)
     panel_transport_leds(beat, !playing, ext_active(), playing);
 }
 
+/* Boot splash: drawn in place of the UI for the first moments after power-on
+ * (the name, then the site on a new line) while the engines, LEDs and panel
+ * input keep running underneath. */
+#define SPLASH_NAME_MS 1200u
+#define SPLASH_END_MS 2400u
+static bool splash_done;
+
+static bool splash_active(void)
+{
+    if (!splash_done && g_ms >= SPLASH_END_MS) splash_done = true;
+    return !splash_done;
+}
+
+static void draw_splash(void)
+{
+    fb_clear();
+    fb_text2x(68, 10, "ALEPH VOID", 15);
+    fb_text2x(74, 28, "CUSTOM FW", 12);
+    if (g_ms >= SPLASH_NAME_MS)
+        fb_text2x(20, 48, "SQ64.ALEPHVOID.COM", 9);
+    display_flush();
+}
+
 static void draw_wave_preview(int x, int y, int w, int h, int lfo)
 {
     for (int i = 0; i < w; i++) {
@@ -786,6 +809,10 @@ static void draw_projects(void)
 __attribute__((noinline))
 static void draw_ui(void)
 {
+    if (splash_active()) {
+        draw_splash();
+        return;
+    }
     if (project_mode) {
         draw_projects();
         return;

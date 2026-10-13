@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 // Normal-mode interaction test against the browser (WASM) engine: panel DMA
-// scanning, both engines' pad LEDs and outputs, per-track mode toggling with
-// SHIFT+track, transport, LFO destinations, MIDI note and CC output, the
-// full project lifecycle over the 64 documented saved-project slots
-// (PROJECT-001..004, covering both engine modes), settings commit and
-// persistence.
+// scanning, both engines' pad LEDs and outputs, per-track engine toggling
+// with SHIFT+track, transport, the spec panel-key requirements (edit modes,
+// bar selection, loop) on both engine types, LFO destination routing inside
+// the edit modes, MIDI note and CC output, the full project lifecycle over
+// the 64 documented saved-project slots (PROJECT-001..004, covering both
+// engine modes), settings commit and persistence.
 //
 // Usage: node tools/browser_panel_test.mjs [path/to/emulator/web] [image.vsb]
 import {readFileSync} from 'node:fs';
@@ -83,7 +84,9 @@ check(idleLeds.trackA > 128, 'selected-track LED lit');
 check(idleLeds.A1 > 128 && idleLeds.A5 > 128 && idleLeds.A2 < 64,
   'sequencer track A default pattern E(4,16) on pad LEDs');
 check(idleLeds.stop > 128 && idleLeds.play < 64, 'stop LED lit while stopped');
-check(idleLeds.mod < 64, 'destination LEDs dark while a sequencer track is edited');
+check(idleLeds.mod < 64 && idleLeds.pitch < 64 && idleLeds.gate < 64 && idleLeds.control < 64,
+  'mode-key LEDs dark while no edit mode is active');
+check(idleLeds.bar1 > 128 && idleLeds.bar2 < 64, 'bar 1 selected by default');
 
 // LFO lanes free-run from boot: C's mod CV must keep moving while stopped.
 const samples = [];
@@ -141,7 +144,6 @@ check(bAfter === 5, `pulses encoder reduced track B to 5 pulses (got ${bAfter})`
 // SHIFT+A switches track A from sequencer to LFO: its default destination is
 // mod CV, its CC is 1 on channel 1, and the pad row becomes a level bar.
 shiftPress('trackA');
-check(machine.board.panel.leds.mod > 128, 'MOD destination LED lit for LFO A');
 const aSamples = [];
 for (let i = 0; i < 6; i++) { aSamples.push(outputLevels(machine.board).Amod); run(800000); }
 check(new Set(aSamples).size > 2, `LFO A mod CV animates (${aSamples.join(',')})`);
@@ -150,10 +152,12 @@ run(4000000);
 check(midi.slice(ccMark).some(m => (m[0] & 0xff) === 0xb0 && m[1] === 1),
   'LFO A streams CC 1 on channel 1');
 
-// The CC encoder (swing position while an LFO is edited) re-assigns LFO A's
-// controller number upward; whatever number it lands on must stream and then
-// persist exactly across the commit and restart below.
-encoder('swing', 5);
+// The CONTROL edit mode (MODE-001) scopes Param 1 to LFO A's MIDI CC number;
+// whatever number it lands on must stream and then persist exactly across
+// the commit and restart below.
+press('control');
+check(machine.board.panel.leds.control > 128, 'CONTROL mode LED lit');
+encoder('param1', 5);
 run(3000000);
 const ccMark2 = midi.length;
 run(4000000);
@@ -161,10 +165,14 @@ const reassigned = midi.slice(ccMark2).filter(m => (m[0] & 0xff) === 0xb0).map(m
 const assignedCC = reassigned.length ? reassigned[reassigned.length - 1] : 1;
 check(assignedCC > 1 && assignedCC <= 6,
   `LFO A streams on a re-assigned controller (CC ${assignedCC})`);
+press('control');
+check(machine.board.panel.leds.control < 64, 'second press leaves CONTROL mode');
 
-// Gate destination on LFO A: square-thresholded gate jack activity.
+// Gate routing on LFO A, edited inside the GATE mode (Param 1 right = on,
+// left = off): square-thresholded gate jack activity.
 press('gate');
-check(machine.board.panel.leds.gate > 128, 'gate destination LED lit after toggle');
+check(machine.board.panel.leds.gate > 128, 'GATE mode LED lit');
+encoder('param1', 1); // route the gate destination on
 let gateHigh = false, gateLow = false;
 for (let i = 0; i < 40 && !(gateHigh && gateLow); i++) {
   run(300000);
@@ -173,9 +181,104 @@ for (let i = 0; i < 40 && !(gateHigh && gateLow); i++) {
   if (g === 0) gateLow = true;
 }
 check(gateHigh && gateLow, 'square-thresholded gate toggles on LFO A jack');
-press('gate'); // toggle back off
+encoder('param1', -1); // route it back off
 run(400000);
-check(outputLevels(machine.board).Agate === 0, 'gate off after destination cleared');
+check(outputLevels(machine.board).Agate === 0, 'gate off after routing cleared');
+press('gate'); // leave the GATE mode
+run(400000);
+
+// --- Edit modes on a sequencer lane (MODE-001): PITCH/GATE/MOD/CONTROL
+// scope the pads to one parameter of the selected track; entry, edits and
+// exit write no storage. ---
+const noteOns = (from, channel) =>
+  midi.slice(from).filter(m => (m[0] & 0xf0) === 0x90 && (m[0] & 15) === channel);
+press('trackB');
+const writesBeforeModes = machine.board.flash.writes;
+press('pitch');
+check(machine.board.panel.leds.pitch > 128, 'PITCH mode LED lit');
+press('B8'); // note 43 (G2)
+press('pitch');
+check(machine.board.panel.leds.pitch < 64, 'second press leaves PITCH mode');
+press('control');
+press('B16'); // velocity 127
+press('control');
+press('gate');
+press('B15'); // gate 89 % of a step
+press('gate');
+press('mod');
+check(machine.board.panel.leds.mod > 128, 'MOD mode LED lit');
+press('B16'); // mod level 15 (full scale)
+press('mod');
+check(bPulses() === 5, 'mode edits left the pattern pulses alone');
+check(machine.board.flash.writes === writesBeforeModes,
+  'mode entry, edits and exit wrote nothing to storage');
+
+// The mode edits are audible: track B now plays note 43 at velocity 127
+// with a full-scale mod CV while its gate is open.
+const modeMark = midi.length;
+press('play');
+run(4000000);
+const bOns = noteOns(modeMark, 1);
+check(bOns.length > 0 && bOns.every(m => m[1] === 43 && m[2] === 127),
+  `track B plays the pitch and velocity set in the edit modes (${bOns.length} notes)`);
+let modSeen = false;
+for (let i = 0; i < 40 && !modSeen; i++) { run(200000); modSeen = outputLevels(machine.board).Bmod === 255; }
+check(modSeen, 'track B mod CV reaches the mod-mode level');
+press('stop');
+run(1000000);
+
+// --- Bar selection (BAR-001): keys 1..4 window the pads onto one 16-step
+// bar of the 64-step pattern space. ---
+press('bar2');
+const barLeds = machine.board.panel.leds;
+check(barLeds.bar2 > 128 && barLeds.bar1 < 64, 'bar 2 selected and shown');
+check(bPulses() === 0, 'bar 2 of a 16-step pattern shows no steps');
+shiftPress('B4'); // SHIFT+pad in bar 2: length = step 20
+check(bPulses() === 1, 'E(5,20) shows exactly its bar-2 step (17)');
+press('bar1');
+check(machine.board.panel.leds.bar1 > 128, 'bar 1 reselected');
+check(bPulses() === 4, 'bar 1 of E(5,20) shows its four steps');
+
+// --- Loop (LOOP-001): LOOP loops step playback over the selected bar of the
+// selected sequencer lane's pattern; clearing it resumes normal playback. ---
+press('B1'); // pulses = 1: track B fires only at step 1 (inside bar 1)
+press('bar2');
+press('loop');
+check(machine.board.panel.leds.loop > 128, 'loop LED lit');
+const loopMark = midi.length;
+press('play');
+run(8000000);
+press('stop');
+run(500000);
+const loopB = noteOns(loopMark, 1).length, loopD = noteOns(loopMark, 9).length;
+check(loopB === 0 && loopD > 0,
+  `loop over bar 2 keeps playback off track B's bar-1 pulse (D ${loopD}, B ${loopB})`);
+press('loop');
+check(machine.board.panel.leds.loop < 64, 'loop cleared');
+const clearMark = midi.length;
+press('play');
+run(8000000);
+press('stop');
+run(500000);
+check(noteOns(clearMark, 1).length > 0, 'clearing the loop resumes normal playback');
+
+// A loop is refused on an LFO lane, and on a bar beyond the active pattern.
+press('trackA'); // track A is an LFO here
+press('loop');
+check(machine.board.panel.leds.loop < 64, 'loop refused on an LFO lane');
+
+// Restore the workspace (track B, E(5,16), bar 1) for the project checks.
+press('bar1');
+shiftPress('B16'); // length = step 16
+press('B5');
+check(bPulses() === 5 && machine.board.panel.leds.trackB > 128,
+  'workspace restored to track B E(5,16)');
+press('bar2');
+press('loop'); // bar 2 now lies beyond the 16-step pattern
+check(machine.board.panel.leds.loop < 64, 'loop beyond the pattern bounds refused');
+press('bar1');
+press('trackA'); // restore the edited-track selection for the commit below
+run(400000);
 
 // --- Project management (PROJECT-001..004) --------------------------------
 // Slot n's record lives in the first bytes of SPI 0xC0000 + n * 0x3D000. The
@@ -199,8 +302,8 @@ hold('shift', true);
 press('A1');
 hold('shift', false);
 const a1 = slotBytes(machine, 0);
-check(a1[0] === 0x41 && a1[1] === 0x47 && a1[2] === 0x50 && a1[3] === 0x31,
-  'save wrote a project record to slot A1 (magic AGP1)');
+check(a1[0] === 0x41 && a1[1] === 0x47 && a1[2] === 0x50 && a1[3] === 0x32,
+  'save wrote a project record to slot A1 (magic AGP2)');
 check(a1[8] === 1 && a1[9] === 0, 'saved record carries the mixed engine modes (A LFO, B sequencer)');
 check(slotBytes(machine, 1).every(b => b === 0xff), 'save left neighbor slot A2 untouched');
 check(settingsSector(machine) === settingsBefore, 'save left the settings sector untouched');

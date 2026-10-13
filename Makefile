@@ -23,9 +23,10 @@ HDRS = $(wildcard src/*.h)
 
 all: build/av-aggregate.vsb
 
-build/av-aggregate.elf: $(SRCS) $(HDRS) linker.ld
+build/av-aggregate.elf: $(SRCS) $(HDRS) linker.ld tools/check_blocks.py
 	@mkdir -p build
 	$(CC) $(CFLAGS) -T linker.ld $(SRCS) -lgcc -o $@
+	$(PYTHON) tools/check_blocks.py $@ --objdump $(CROSS)objdump
 
 build/av-aggregate.bin: build/av-aggregate.elf
 	$(OBJCOPY) -O binary $< $@

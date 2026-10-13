@@ -9,8 +9,8 @@
 
 int memcmp(const void *a, const void *b, size_t n); /* startup.c */
 
-#define SETTINGS_MAGIC 0x31474741u /* "AGG1" */
-#define PROJECT_MAGIC  0x31504741u /* "AGP1" */
+#define SETTINGS_MAGIC 0x32474741u /* "AGG2" */
+#define PROJECT_MAGIC  0x32504741u /* "AGP2" */
 
 static void cs(bool selected)
 {
@@ -92,10 +92,10 @@ static uint32_t fnv1a(const void *data, uint32_t length)
 #define RECORD_HASH(r) fnv1a(r, sizeof(*(r)) - sizeof(uint32_t))
 
 static const track_cfg_t TRACK_DEFAULTS[4] = {
-    {16, 4, 0, 60, 50}, /* A: four on the floor, C4  */
-    {16, 3, 2, 48, 50}, /* B */
-    {12, 5, 0, 36, 50}, /* C */
-    {16, 7, 0, 38, 50}, /* D: triggers               */
+    {16, 4, 0, 60, 50, 100, 13}, /* A: four on the floor, C4  */
+    {16, 3, 2, 48, 50, 100, 13}, /* B */
+    {12, 5, 0, 36, 50, 100, 13}, /* C */
+    {16, 7, 0, 38, 50, 100, 13}, /* D: triggers               */
 };
 static const lfo_cfg_t LFO_DEFAULTS[4] = {
     /* wave       div         depth phase cc  dest */
@@ -109,9 +109,10 @@ static const uint8_t MODE_DEFAULTS[4] = {MODE_SEQ, MODE_SEQ, MODE_LFO, MODE_LFO}
 
 static bool track_cfg_valid(const track_cfg_t *c)
 {
-    return c->length >= 1 && c->length <= 16 && c->pulses <= c->length
+    return c->length >= 1 && c->length <= 64 && c->pulses <= c->length
         && c->rotate < c->length && c->note <= 127
-        && c->gate_pct >= 5 && c->gate_pct <= 95;
+        && c->gate_pct >= 5 && c->gate_pct <= 95
+        && c->velocity >= 1 && c->velocity <= 127 && c->mod <= 15;
 }
 
 static bool lfo_cfg_valid(const lfo_cfg_t *l)

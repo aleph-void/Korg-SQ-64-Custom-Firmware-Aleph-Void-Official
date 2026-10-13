@@ -41,19 +41,37 @@ SHIFT+track press away, and the mix persists with the rest of the settings.
 ## Feature sets, as in the originals
 
 **Sequencer lane** (per track in SEQ mode): Euclidean pattern E(pulses,
-length) with rotation, 1–16 steps, polymetric against the other lanes; swing
+length) with rotation, 1–64 steps in four bars of 16, polymetric against the
+other lanes; per-track note, gate length, mod CV level and velocity; swing
 50–75 % across all sequencer lanes. Lanes A/B/C drive their gate jack, pitch
 CV, mod CV and MIDI notes on channels 1–3; lane D drives trigger jack 1 and
-MIDI channel 10. Pad LEDs show the pattern with a moving playhead.
+MIDI channel 10. Pad LEDs show the selected bar of the pattern with a moving
+playhead.
 
 **LFO lane** (per track in LFO mode): six waveforms — sine, triangle, rise,
 fall, square, sample & hold — sixteen synced rate divisions from 8 bars to
 1/32 including dotted and triplet values, per-LFO depth, phase offset and
 MIDI CC number streamed on channels 1–4 (USB and DIN, rate-limited, sent only
 on change). LFOs A/B/C can drive their mod CV, pitch CV and gate jacks
-(gate = square-thresholded LFO), toggled with the GATE / PITCH / MOD buttons;
-LFO D pulses trigger jack 1 once per cycle. Pad LEDs are a live level bar and
-the display shows a waveform preview with a phase cursor.
+(gate = square-thresholded LFO), routed inside the PITCH / GATE / MOD edit
+modes; LFO D pulses trigger jack 1 once per cycle. Pad LEDs are a live level
+bar and the display shows a waveform preview with a phase cursor.
+
+**The spec's panel-key requirements** (TRACK/MODE/LOOP/BAR/TAP/TEMPO/
+SWING-001): A–D select the edited track; the PITCH, GATE, MOD and CONTROL
+keys each toggle an edit mode scoping the pads and param encoders to that
+mode's documented parameters on the selected track — on a sequencer lane one
+pad-edited parameter (note, gate %, mod CV level, velocity), on an LFO lane
+that destination's routing on the Param 1 encoder plus its companion
+parameter (phase offset, depth, or the MIDI CC number in the CONTROL mode).
+Keys 1–4 select which 16-step bar the pads, pad LEDs and display lanes
+address; LOOP loops step playback over the selected bar of the selected
+sequencer lane's pattern (refused on an LFO lane or when the bar lies beyond
+the pattern, clipped or cleared if a later edit moves the pattern end), and
+clearing it resumes the free-running step counter. The tempo encoder moves
+one BPM per detent across 20–300, the swing encoder one percent across
+50–75 (50 = unswung), both clamped without wraparound. Track selection, mode
+entry/exit, bar keys, loop toggles and taps alone never change stored data.
 
 Settings persist to SPI flash (GLOBAL commits; the power button saves and
 shuts down cleanly through the PB7 power hold), and the PROJECT manager
@@ -62,41 +80,81 @@ drives the full project lifecycle over the 64 documented saved-project slots
 workspace left unchanged on rejection (spec PROJECT-001..004) — see
 [Projects](#projects). Boot chords per the spec:
 hold **GLOBAL** at power-on for version mode, **GLOBAL+PATTERN** for update
-mode, with the same complete VUP self-updater as the sibling firmwares
+mode. In version mode the PLAY indicator is lit, and pressing **PLAY**
+continues the normal boot sequence to the ready state (BOOT-004). Update
+mode carries the same complete VUP self-updater as the sibling firmwares
 (protocol 1, 1024-byte packets, full validation before a RAM-resident
 installer programs anything).
+
+A boot splash is declared (spec SPLASH-001): entering normal mode draws the
+Aleph Void name for the first 2.4 s — through the ordinary framebuffer
+primitives and the same DMA display path as every other frame — while the
+engines, pad LEDs and panel input already run underneath, so the declared
+ready state is reached and the startup-mode chords (sampled before normal
+mode starts) are honored regardless of the splash.
 
 ## Controls (normal mode)
 
 | Control | Action |
 | --- | --- |
-| PLAY / STOP | Start from step 0 with all LFO phases resynced / stop (sequencer notes off, LFOs keep running) |
+| PLAY / STOP | Start from step 0 (or the loop start) with all LFO phases resynced / stop (sequencer notes off, LFOs keep running) |
 | TAP | Tap tempo |
 | A B C D | Select the edited track |
 | SHIFT + A B C D | Toggle that track between sequencer lane and LFO |
-| Pad *n* (row of track *t*) | SEQ: set pulses to *n* · LFO: set rate division *n* (1=8 bars … 16=1/32) |
-| SHIFT + pad *n* | SEQ: set length to *n* · LFO: set waveform (1=sine 2=tri 3=rise 4=fall 5=square 6=S+H) |
-| GATE / PITCH / MOD | LFO lane only: toggle that destination (on D, GATE = cycle trigger) |
-| Tempo encoder | BPM (internal clock) |
-| Swing encoder | SEQ: swing % · LFO: MIDI CC number |
-| Param 1–4 encoders | SEQ: pulses, length, rotation, note · LFO: waveform, rate, depth, phase |
+| PITCH / GATE / MOD / CONTROL | Toggle that [edit mode](#edit-modes) (same key again leaves it) |
+| 1 2 3 4 | Select the bar the pads address (pad *n* = step (bar−1)×16+*n*) |
+| LOOP | Toggle a loop over the selected bar of the selected sequencer lane's pattern |
+| Pad *n* (row of track *t*) | SEQ: set pulses to the selected step · LFO: set rate division *n* (1=8 bars … 16=1/32) — or the active edit mode's parameter |
+| SHIFT + pad *n* | Outside the edit modes only — SEQ: set length to the selected step · LFO: set waveform (1=sine 2=tri 3=rise 4=fall 5=square 6=S+H) |
+| Tempo encoder | BPM 20–300, one per detent, clamped |
+| Swing encoder | Swing 50–75 %, one per detent, clamped; 50 = unswung (sequencer lanes) |
+| Param 1–4 encoders | SEQ: pulses, length, rotation, note · LFO: waveform, rate, depth, phase — or the active edit mode's parameters |
 | GLOBAL | Commit settings to SPI flash |
 | PROJECT | Open / close the project manager (pads become the 64 slots) |
 | SHIFT + PROJECT | New project: reset the workspace to the declared defaults |
 | Power button | Save and shut down |
 
+Declared SHIFT combinations (spec SHIFT-001): SHIFT+track (engine toggle),
+SHIFT+pad outside the edit modes (length on a sequencer lane, waveform on an
+LFO lane), SHIFT+pad in the project manager (save) and SHIFT+PROJECT (new
+project). SHIFT alone, and SHIFT with any other control — including pads
+inside the edit modes — has no effect.
+
+## Edit modes
+
+The PITCH, GATE, MOD and CONTROL keys each toggle a documented edit mode
+over the normal surface (spec MODE-001). The active mode is reported on its
+key LED and named on the display; pressing the same key leaves, pressing a
+different mode key switches directly. Entering or leaving a mode changes no
+pattern, workspace or settings data, and all edits inside a mode go to that
+mode's documented parameters on the selected track only. What a mode edits
+follows the selected track's engine:
+
+| Mode | Sequencer lane (pads 1–16) | LFO lane (Param 1 / Param 2 / pads) |
+| --- | --- | --- |
+| PITCH | Note 36+*n*−1 | Pitch-CV routing on/off (right/left; A–C) / phase offset / pad *n* = *n*−1 sixteenths of phase |
+| GATE | Gate length 5+(*n*−1)×6 % | Gate routing on/off (A–C; on D the cycle trigger) / — / — |
+| MOD | Mod CV level *n*−1 | Mod-CV routing on/off (A–C) / depth 0–100 % / — |
+| CONTROL | Velocity (*n*−1)×8+7 | MIDI CC number 0–127 / — / — |
+
+On a sequencer lane the param encoders keep their normal assignments inside
+every mode. LFO D has no pitch/mod jacks: the PITCH and MOD modes report
+`NO JACK ON D` there and route nothing. Controls marked — are documented
+inert in that mode.
+
 ## Projects
 
 A project is the workspace's musical content in both engine modes: each
 track's engine selection **and** both of its engine configurations — the
-sequencer parameters (pulses, length, rotation, note, gate) and the LFO
+sequencer parameters (pulses, length, rotation, note, gate, velocity, mod
+level) and the LFO
 parameters (waveform, rate division, depth, phase, CC number, destinations) —
 plus the tempo and swing. Loading a project therefore restores a track in
 either mode with the other engine's setup intact behind the toggle. The
 edited-track selection stays in the settings sector. The 64 saved-project
 slots follow the spec's documented catalog at SPI `0xC0000 + n × 0x3D000`;
 this firmware's record occupies the first 4 KiB sector of its slot (magic
-`AGP1`, FNV-1a checked) and the rest of the slot region is never written.
+`AGP2`, FNV-1a checked) and the rest of the slot region is never written.
 
 Press **PROJECT** to open the project manager. The 64 pads become the 64
 slots (bank A pad 1 = slot A1 … bank D pad 16 = slot D16), lit when populated
@@ -157,9 +215,9 @@ emulator**, and run. The LFO lanes animate from the moment the panel comes
 up; press PLAY to add the Euclidean lanes. Importable demo scripts for the
 workbench's **UI scripts** panel live in [`scripts/`](scripts/README.md);
 they walk through every major function (mixed-engine transport, editing both
-engine types, the SHIFT+track engine toggle, MIDI remote start/stop,
-external MIDI clock sync, persistence, project management, version mode and
-a full self-update).
+engine types, the edit modes with bar selection and the loop, the
+SHIFT+track engine toggle, MIDI remote start/stop, external MIDI clock sync,
+persistence, project management, version mode and a full self-update).
 
 Native headless:
 
@@ -174,12 +232,13 @@ make smoke      # 2M instructions, report in build/smoke.json
   tick interrupts, LFO MIDI CC streaming while stopped (and no clock or
   notes), MIDI start driving sequenced note-ons plus clock with CCs
   continuing, external-clock following without re-emission, version and
-  update boot chords, VUP discovery / version / begin, ordered packets, and
-  rejection of out-of-order packets, wrong blocks, and installs outside
-  update mode — with zero flash writes. Project mode runs against this
-  engine's 1 MiB SPI model: the JEDEC capacity probe keeps every access
-  inside the part, slot 0 saves / loads / deletes, and the unavailable
-  slot 1 is refused without a flash write.
+  update boot chords (including the lit PLAY indicator in version mode and
+  PLAY continuing the boot to the ready state, BOOT-004), VUP discovery /
+  version / begin, ordered packets, and rejection of out-of-order packets,
+  wrong blocks, and installs outside update mode — with zero flash writes.
+  Project mode runs against this engine's 1 MiB SPI model: the JEDEC
+  capacity probe keeps every access inside the part, slot 0 saves / loads /
+  deletes, and the unavailable slot 1 is refused without a flash write.
 - `tools/browser_update_test.mjs` (browser WASM engine): full end-to-end
   installation — update-mode boot via the panel chord, USB MIDI enumeration,
   all 224 packets through the firmware's own updater under the workbench's
@@ -187,8 +246,13 @@ make smoke      # 2M instructions, report in build/smoke.json
   the three installed SPI regions, with no critical hazard tripped.
 - `tools/browser_panel_test.mjs` (browser WASM engine): DMA panel scanning,
   both engines' pad LEDs and outputs, the SHIFT+track engine toggle in both
-  directions (including track D's trigger lane and channel-10 notes), LFO
-  destination toggles, MIDI note and CC output with CC reassignment,
+  directions (including track D's trigger lane and channel-10 notes), the
+  spec panel-key requirements on both engine types — the PITCH/GATE/MOD/
+  CONTROL edit modes (storage-silent entry/exit, audible pitch/velocity/mod
+  edits on a sequencer lane, CC reassignment and gate routing on an LFO
+  lane), bar selection windowing the 64-step pattern space, and the loop
+  (pinned playback, clearing, refusal on an LFO lane and beyond the pattern
+  bounds) — MIDI note and CC output,
   transport, GLOBAL commit, the full project lifecycle (save to first and
   last slots with untouched-slot and settings guards, new-project defaults
   without flash writes, exact load-back of both engine modes,
@@ -202,8 +266,8 @@ make smoke      # 2M instructions, report in build/smoke.json
 | --- | --- |
 | Internal flash 0x00200000 + 64 KiB | This firmware (VSB payload 0x00000) |
 | SPI 0x00000–0x30000 | Installed-image regions; written only by the updater during a host-initiated installation |
-| SPI 0x40000 (one 4 KiB sector) | Committed settings (magic `AGG1`, FNV-1a checked); rewritten only when contents change |
-| SPI 0xC0000 + n × 0x3D000 (first 4 KiB sector of each of the 64 documented slots) | Saved projects (magic `AGP1`, FNV-1a checked); written only by the explicit save and delete operations |
+| SPI 0x40000 (one 4 KiB sector) | Committed settings (magic `AGG2`, FNV-1a checked); rewritten only when contents change |
+| SPI 0xC0000 + n × 0x3D000 (first 4 KiB sector of each of the 64 documented slots) | Saved projects (magic `AGP2`, FNV-1a checked); written only by the explicit save and delete operations |
 | Everything else | Never written |
 
 ## Provenance
@@ -232,5 +296,12 @@ Licensed under the MIT License (see LICENSE).
   are the product.
 - Swing applies to the sequencer lanes only; LFO phases follow the unswung
   transport grid.
+- LFO lanes have no step grid: the bar keys and the loop act on sequencer
+  lanes (the pads still edit an LFO lane's rate/waveform in every bar), and
+  the pads are documented inert in an LFO lane's GATE, MOD and CONTROL
+  modes.
+- The PATTERN key has no normal-mode function; patterns-per-track as in the
+  sibling lfos firmware are not implemented. PATTERN participates only in
+  the GLOBAL+PATTERN update-mode boot chord.
 - Quantitative timing claims (jitter, latency) require hardware measurement
   and are not made.

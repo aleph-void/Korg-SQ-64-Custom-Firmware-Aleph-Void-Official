@@ -21,32 +21,32 @@ SRCS = src/startup.c src/main.c src/panel.c src/display.c src/outputs.c \
        src/midi.c src/usb.c src/storage.c src/updater.c
 HDRS = $(wildcard src/*.h)
 
-all: build/av-aggregate.vsb
+all: build/aleph-void-custom-fw.vsb
 
-build/av-aggregate.elf: $(SRCS) $(HDRS) linker.ld tools/check_blocks.py
+build/aleph-void-custom-fw.elf: $(SRCS) $(HDRS) linker.ld tools/check_blocks.py
 	@mkdir -p build
 	$(CC) $(CFLAGS) -T linker.ld $(SRCS) -lgcc -o $@
 	$(PYTHON) tools/check_blocks.py $@ --objdump $(CROSS)objdump
 
-build/av-aggregate.bin: build/av-aggregate.elf
+build/aleph-void-custom-fw.bin: build/aleph-void-custom-fw.elf
 	$(OBJCOPY) -O binary $< $@
 
-build/av-aggregate.vsb: build/av-aggregate.bin tools/make_vsb.py
+build/aleph-void-custom-fw.vsb: build/aleph-void-custom-fw.bin tools/make_vsb.py
 	$(PYTHON) tools/make_vsb.py $< $@ --major $(VERSION_MAJOR) --minor $(VERSION_MINOR)
 
 # Run the pinned conformance spec's seven image-profile checks.
-check: build/av-aggregate.vsb
+check: build/aleph-void-custom-fw.vsb
 	cd $(SPEC_DIR) && $(PYTHON) -m sq64_spec $(abspath $<) --profile image
 
 # Headless smoke run in the native emulator (requires `pip install -e` there).
-smoke: build/av-aggregate.vsb
+smoke: build/aleph-void-custom-fw.vsb
 	cd $(EMULATOR_DIR) && $(PYTHON) -m sq64_emulator $(abspath $<) \
 	  --headless --instructions 2000000 --report $(abspath build/smoke.json)
 
 # Behavioral tests. The Python harness needs the emulator's dependencies
 # (unicorn 2.1.3, capstone, pyelftools); the Node tests use the emulator's
 # vendored WASM engine and need no installation.
-test: build/av-aggregate.vsb
+test: build/aleph-void-custom-fw.vsb
 	$(PYTHON) tools/headless_test.py --emulator $(EMULATOR_DIR)
 	node tools/browser_update_test.mjs $(EMULATOR_DIR)/web
 	node tools/browser_panel_test.mjs $(EMULATOR_DIR)/web

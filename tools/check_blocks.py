@@ -13,7 +13,7 @@ instructions without a control transfer. The limit of 80 keeps a comfortable
 margin below the observed trap threshold for store-heavy code (a 95-
 instruction spill run trapped; 83 ran).
 
-Usage: check_blocks.py build/av-aggregate.elf [--objdump arm-none-eabi-objdump]
+Usage: check_blocks.py build/aleph-void-custom-fw.elf [--objdump arm-none-eabi-objdump]
 """
 import argparse
 import re

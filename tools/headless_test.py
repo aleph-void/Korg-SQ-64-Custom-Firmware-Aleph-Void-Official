@@ -19,7 +19,7 @@ save, load and delete, and the unavailable slot 1 must be refused without a
 flash write. Full 64-slot coverage lives in tools/browser_panel_test.mjs
 against the 16 MiB browser model.
 
-Usage: python3 tools/headless_test.py [--emulator ../../emulator] [--image build/av-aggregate.vsb]
+Usage: python3 tools/headless_test.py [--emulator ../../emulator] [--image build/aleph-void-custom-fw.vsb]
 """
 import argparse
 import sys
@@ -326,7 +326,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     root = Path(__file__).resolve().parent.parent
     parser.add_argument('--emulator', type=Path, default=root / '..' / '..' / 'emulator')
-    parser.add_argument('--image', type=Path, default=root / 'build' / 'av-aggregate.vsb')
+    parser.add_argument('--image', type=Path, default=root / 'build' / 'aleph-void-custom-fw.vsb')
     args = parser.parse_args()
     sys.path.insert(0, str(args.emulator.resolve()))
     image = args.image.read_bytes()

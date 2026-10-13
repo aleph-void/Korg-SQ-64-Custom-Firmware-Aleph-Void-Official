@@ -196,7 +196,7 @@ playhead, or wave/rate/CC with a live level bar).
 Requires the GNU Arm toolchain (`arm-none-eabi-gcc`) and Python 3.
 
 ```sh
-make            # build/av-aggregate.elf, .bin and .vsb
+make            # build/aleph-void-custom-fw.elf, .bin and .vsb
 make check      # run the spec's seven image-profile checks on the VSB
 make test       # headless + browser-engine behavioral tests (see below)
 ```
@@ -210,7 +210,7 @@ filling unused payload with 0xFF and balancing the four region checksums.
 ## Run it
 
 Browser workbench (recommended): in `../../emulator/web`, `npm ci && npm run
-dev`, open the printed URL, load `build/av-aggregate.vsb` in **Browser
+dev`, open the printed URL, load `build/aleph-void-custom-fw.vsb` in **Browser
 emulator**, and run. The LFO lanes animate from the moment the panel comes
 up; press PLAY to add the Euclidean lanes. Importable demo scripts for the
 workbench's **UI scripts** panel live in [`scripts/`](scripts/README.md);

@@ -14,7 +14,7 @@ import {pathToFileURL} from 'node:url';
 import {resolve} from 'node:path';
 
 const webRoot = resolve(process.argv[2] || new URL('../../../emulator/web', import.meta.url).pathname);
-const imagePath = resolve(process.argv[3] || new URL('../build/av-aggregate.vsb', import.meta.url).pathname);
+const imagePath = resolve(process.argv[3] || new URL('../build/aleph-void-custom-fw.vsb', import.meta.url).pathname);
 const load = path => import(pathToFileURL(resolve(webRoot, path)));
 
 const {default: createUnicorn} = await load('vendor/unicorn-arm.js');

@@ -8,7 +8,7 @@ emulator — no hardware involved.
 
 1. In `../../../../emulator/web`: `npm ci && npm run dev`, open the printed
    URL and expand **Browser emulator**.
-2. Load `build/av-aggregate.vsb` (build it first with `make`).
+2. Load `build/aleph-void-custom-fw.vsb` (build it first with `make`).
 3. Expand **UI scripts** below the instrument panel, choose **Import
    script**, select one of these files, then **Run script**.
 

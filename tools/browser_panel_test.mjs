@@ -307,14 +307,48 @@ press('project'); // enter the project manager
 run(400000);
 check(machine.board.panel.leds.project > 128, 'PROJECT LED lit in project mode');
 
+// Name editor: Param 2 steps the character at the cursor through the list,
+// Param 3 moves the cursor (stock layout). The default workspace name is
+// INIT PROJECT; edit it to JMIT PROJECT before saving. Detents can land in a
+// replaced scan half-buffer (see `encoder`), so edit closed-loop against the
+// rendered name field: character cells at (56 + i*6, 1), cursor underline on
+// framebuffer row 9 (4-bit pixels, rows bottom-first, even x low nibble).
+const px = (x, y) => (machine.board.panel.display[(63 - y) * 128 + (x >> 1)] >> ((x & 1) ? 4 : 0)) & 15;
+const nameCell = i => {
+  let s = '';
+  for (let y = 1; y <= 7; y++) for (let x = 0; x < 5; x++) s += px(56 + i * 6 + x, y) ? 1 : 0;
+  return s;
+};
+const nameCursorPos = () => {
+  for (let i = 0; i < 12; i++) if (px(56 + i * 6, 9) === 15) return i;
+  return -1;
+};
+const editChar = delta => { // one character step at the cursor, retried if dropped
+  const i = nameCursorPos();
+  const before = nameCell(i);
+  for (let t = 0; t < 8 && nameCell(i) === before; t++) { encoder('param2', delta); run(1200000); }
+};
+const moveCursor = delta => {
+  const want = nameCursorPos() + delta;
+  for (let t = 0; t < 8 && nameCursorPos() !== want; t++) { encoder('param3', delta); run(1200000); }
+};
+run(1200000); // let the project screen render before reading it back
+check(nameCursorPos() === 0, 'name cursor starts at position 0');
+editChar(1);   // I -> J at cursor 0
+moveCursor(1); // cursor to position 1
+editChar(-1);  // N -> M
+
 // PROJECT-003: SHIFT+pad saves the workspace to slot A1 only.
 const settingsBefore = settingsSector(machine);
 hold('shift', true);
 press('A1');
 hold('shift', false);
-const a1 = slotBytes(machine, 0);
-check(a1[0] === 0x41 && a1[1] === 0x47 && a1[2] === 0x50 && a1[3] === 0x32,
-  'save wrote a project record to slot A1 (magic AGP2)');
+const a1 = slotBytes(machine, 0, 96);
+check(a1[0] === 0x41 && a1[1] === 0x47 && a1[2] === 0x50 && a1[3] === 0x33,
+  'save wrote a project record to slot A1 (magic AGP3)');
+const recordName = m => String.fromCharCode(...slotBytes(m, 0, 96).slice(64, 76));
+check(recordName(machine) === 'JMIT PROJECT',
+  `saved record carries the edited name (got "${recordName(machine)}")`);
 check(a1[8] === 1 && a1[9] === 0, 'saved record carries the mixed engine modes (A LFO, B sequencer)');
 check(slotBytes(machine, 1).every(b => b === 0xff), 'save left neighbor slot A2 untouched');
 check(settingsSector(machine) === settingsBefore, 'save left the settings sector untouched');
@@ -377,6 +411,8 @@ hold('shift', true);
 press('D16');
 hold('shift', false);
 check(slotBytes(machine, 63)[0] === 0x41, 'project saved to last slot D16');
+check(String.fromCharCode(...slotBytes(machine, 63, 96).slice(64, 76)) === 'JMIT PROJECT',
+  'name restored by the earlier slot A1 load carried into the D16 record');
 press('project'); // leave the project manager
 run(400000);
 check(machine.board.panel.leds.project < 64, 'PROJECT LED off after leaving project mode');
@@ -387,6 +423,9 @@ const writesBefore = machine.board.flash.writes;
 press('global');
 run(2000000);
 check(machine.board.flash.writes > writesBefore, 'GLOBAL committed settings to SPI flash');
+const settingsName = String.fromCharCode(...machine.board.flash.data.slice(0x40000 + 64, 0x40000 + 76));
+check(settingsName === 'JMIT PROJECT',
+  `committed settings carry the workspace name (got "${settingsName}")`);
 
 machine.event({type: 'power', down: true});
 run(4000000);

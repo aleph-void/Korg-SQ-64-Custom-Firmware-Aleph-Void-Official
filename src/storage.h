@@ -17,14 +17,20 @@ void spi_flash_program(uint32_t address, const uint8_t *data, uint32_t length);
 /* Saved project slots (board contract): slot n is the 0x3d000-byte region at
  * 0xc0000 + n*0x3d000, the same catalog stock firmware uses for its saved
  * projects. This firmware stores one project record (the workspace: engine
- * modes, both engines' track configurations, tempo, swing) in the first 4 KiB
- * sector of a slot and never touches the rest of the region. Slots past the
+ * modes, both engines' track configurations, tempo, swing, name) in the
+ * first 4 KiB sector of a slot and never touches the rest of the region. Slots past the
  * end of the fitted SPI part (JEDEC capacity) are unavailable rather than
  * silently aliased. */
 #define PROJECT_SLOTS 64
 #define PROJECT_BASE 0xc0000u
 #define PROJECT_SLOT_BYTES 0x3d000u
 #define PROJECT_ADDR(slot) (PROJECT_BASE + (uint32_t)(slot) * PROJECT_SLOT_BYTES)
+
+/* Project and workspace names, as in stock firmware: a fixed 12 characters,
+ * space padded, no terminator. The editor's character list is the stock
+ * order reduced to what the 5x7 font renders distinctly (space, A..Z, 0..9,
+ * then the symbols); records tolerate any byte the font can draw. */
+#define PROJ_NAME_LEN 12
 
 /* Per-track engine: a Euclidean sequencer lane or a synced LFO. */
 #define MODE_SEQ 0
@@ -73,6 +79,7 @@ typedef struct {
     uint8_t mode[4];   /* MODE_SEQ or MODE_LFO per track */
     track_cfg_t track[4]; /* sequencer parameters, kept across mode toggles */
     lfo_cfg_t lfo[4];     /* LFO parameters, kept across mode toggles */
+    char name[PROJ_NAME_LEN]; /* workspace project name, space padded */
     uint32_t hash;
 } settings_t;
 
@@ -82,8 +89,8 @@ void settings_save(const settings_t *s);
 
 /* A project is the workspace's musical content for both engine modes: the
  * per-track engine selection plus every track's sequencer and LFO
- * configurations, with the tempo and swing. The edited-track selection stays
- * in the settings sector. */
+ * configurations, with the tempo, swing and name. The edited-track selection
+ * stays in the settings sector. */
 typedef struct {
     uint32_t magic;
     uint16_t bpm;      /* 20..300 */
@@ -92,6 +99,7 @@ typedef struct {
     uint8_t mode[4];   /* MODE_SEQ or MODE_LFO per track */
     track_cfg_t track[4];
     lfo_cfg_t lfo[4];
+    char name[PROJ_NAME_LEN]; /* space padded */
     uint32_t hash;
 } project_t;
 

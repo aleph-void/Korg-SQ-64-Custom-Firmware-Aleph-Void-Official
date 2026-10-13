@@ -9,8 +9,8 @@
 
 int memcmp(const void *a, const void *b, size_t n); /* startup.c */
 
-#define SETTINGS_MAGIC 0x32474741u /* "AGG2" */
-#define PROJECT_MAGIC  0x32504741u /* "AGP2" */
+#define SETTINGS_MAGIC 0x33474741u /* "AGG3" */
+#define PROJECT_MAGIC  0x33504741u /* "AGP3" */
 
 static void cs(bool selected)
 {
@@ -107,6 +107,23 @@ static const lfo_cfg_t LFO_DEFAULTS[4] = {
 /* Mixed by default: rhythm on A/B, modulation on C/D. */
 static const uint8_t MODE_DEFAULTS[4] = {MODE_SEQ, MODE_SEQ, MODE_LFO, MODE_LFO};
 
+/* Stock firmware's default project name, in this font's uppercase: exactly
+ * PROJ_NAME_LEN characters, no terminator. */
+static const char NAME_DEFAULT[PROJ_NAME_LEN] = "INIT PROJECT";
+
+static void name_default(char *name)
+{
+    for (int i = 0; i < PROJ_NAME_LEN; i++) name[i] = NAME_DEFAULT[i];
+}
+
+static bool name_valid(const char *name)
+{
+    /* Any byte the 5x7 font renders distinctly: space through 'Z'. */
+    for (int i = 0; i < PROJ_NAME_LEN; i++)
+        if (name[i] < 0x20 || name[i] > 0x5a) return false;
+    return true;
+}
+
 static bool track_cfg_valid(const track_cfg_t *c)
 {
     return c->length >= 1 && c->length <= 64 && c->pulses <= c->length
@@ -141,6 +158,7 @@ void settings_defaults(settings_t *s)
         s->track[t] = TRACK_DEFAULTS[t];
         s->lfo[t] = LFO_DEFAULTS[t];
     }
+    name_default(s->name);
     s->hash = RECORD_HASH(s);
 }
 
@@ -149,7 +167,7 @@ static bool settings_valid(const settings_t *s)
     if (s->magic != SETTINGS_MAGIC || s->hash != RECORD_HASH(s)) return false;
     if (s->bpm < 20 || s->bpm > 300 || s->swing < 50 || s->swing > 75 || s->selected > 3)
         return false;
-    return lanes_valid(s->mode, s->track, s->lfo);
+    return lanes_valid(s->mode, s->track, s->lfo) && name_valid(s->name);
 }
 
 bool settings_load(settings_t *s)
@@ -207,6 +225,7 @@ void project_defaults(project_t *p)
         p->track[t] = TRACK_DEFAULTS[t];
         p->lfo[t] = LFO_DEFAULTS[t];
     }
+    name_default(p->name);
     p->hash = RECORD_HASH(p);
 }
 
@@ -214,7 +233,7 @@ static bool project_valid(const project_t *p)
 {
     if (p->magic != PROJECT_MAGIC || p->hash != RECORD_HASH(p)) return false;
     if (p->bpm < 20 || p->bpm > 300 || p->swing < 50 || p->swing > 75) return false;
-    return lanes_valid(p->mode, p->track, p->lfo);
+    return lanes_valid(p->mode, p->track, p->lfo) && name_valid(p->name);
 }
 
 slot_state_t project_load(int slot, project_t *out)

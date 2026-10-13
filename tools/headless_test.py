@@ -197,8 +197,10 @@ def test_project_mode(image):
     set_row(h, 0, 1 << 26)
     set_row(h, 0, 0)
     set_row(h, 7, 0)
-    record = bytes(flash.data[PROJECT_SLOT0:PROJECT_SLOT0 + 64])
-    expect(record[:4] == b'AGP2', 'slot 0 holds a project record')
+    record = bytes(flash.data[PROJECT_SLOT0:PROJECT_SLOT0 + 96])
+    expect(record[:4] == b'AGP3', 'slot 0 holds a project record')
+    expect(record[64:76] == b'INIT PROJECT',
+           'saved record carries the default project name')
     expect(record[12 + 7] == 16 and record[12 + 7 + 1] == 7,
            'saved record carries the edited workspace (track B E(7,16))')
     expect(record[8:12] == bytes([0, 0, 1, 1]),
@@ -231,7 +233,7 @@ def test_project_mode(image):
     set_row(h, 6, 1 << 18)  # GLOBAL commit
     set_row(h, 6, 0, 1200000)
     settings = bytes(flash.data[SETTINGS_ADDR:SETTINGS_ADDR + 64])
-    expect(settings[:4] == b'AGG2' and settings[12 + 7] == 16 and settings[12 + 7 + 1] == 7,
+    expect(settings[:4] == b'AGG3' and settings[12 + 7] == 16 and settings[12 + 7 + 1] == 7,
            'loaded project restored the workspace (committed settings match)')
 
     # RECORD (row 1, bit 0) + pad A1 deletes slot 0.

@@ -38,7 +38,9 @@
  * save, RECORD+pad = delete. SHIFT+PROJECT starts a new project (workspace
  * back to the declared defaults) without touching any saved slot
  * (PROJECT-001..004). A project carries both engine modes: each track's
- * engine selection and both its sequencer and LFO configurations.
+ * engine selection and both its sequencer and LFO configurations — and a
+ * 12-character name, edited in project mode with the Param 2 (character)
+ * and Param 3 (cursor) encoders as in stock firmware's save flow.
  */
 #include <stdbool.h>
 
@@ -84,6 +86,7 @@ static bool playing;
 static bool project_mode;
 static uint8_t cur_slot = SLOT_NONE;     /* last loaded/saved slot */
 static uint8_t slot_states[PROJECT_SLOTS];
+static uint8_t name_cursor;              /* edited name position 0..11 */
 static const char *proj_msg;
 static int proj_msg_slot = -1;           /* -1: message without a slot name */
 static uint32_t proj_msg_ms;
@@ -486,6 +489,36 @@ static void project_rescan(void)
         slot_states[n] = (uint8_t)project_state(n);
 }
 
+/* Name editor character list: stock firmware's order (space, letters, digits,
+ * symbols) reduced to the glyphs this font renders distinctly. */
+static const char NAME_CHARS[] =
+    " ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!?#$%&'()*+,-./:;<=>@";
+
+static int name_char_index(char c)
+{
+    for (int i = 0; NAME_CHARS[i]; i++)
+        if (NAME_CHARS[i] == c) return i;
+    return -1; /* as in stock: one step forward from an unknown gives space */
+}
+
+/* The name editor in the project manager, as in stock firmware's save flow:
+ * one encoder steps the character at the cursor through the list, another
+ * moves the cursor, both clamped at their ends without wraparound. The name
+ * is workspace data: saved in the project record, committed with settings. */
+static void name_edit(int d_char, int d_cursor)
+{
+    if (d_cursor) {
+        int cur = name_cursor + d_cursor;
+        name_cursor = (uint8_t)(cur < 0 ? 0 : cur > PROJ_NAME_LEN - 1
+                                            ? PROJ_NAME_LEN - 1 : cur);
+    }
+    if (d_char) {
+        int last = (int)sizeof(NAME_CHARS) - 2;
+        int at = name_char_index(cfg.name[name_cursor]) + d_char;
+        cfg.name[name_cursor] = NAME_CHARS[at < 0 ? 0 : at > last ? last : at];
+    }
+}
+
 /* Replace the workspace content with a project's. Both engines are silenced
  * once; the next loop iteration rewrites whatever the loaded lanes drive. */
 static void apply_project(const project_t *p)
@@ -505,6 +538,7 @@ static void apply_project(const project_t *p)
         cfg.track[t] = p->track[t];
         cfg.lfo[t] = p->lfo[t];
     }
+    for (int i = 0; i < PROJ_NAME_LEN; i++) cfg.name[i] = p->name[i];
 }
 
 static void workspace_to_project(project_t *p)
@@ -517,6 +551,7 @@ static void workspace_to_project(project_t *p)
         p->track[t] = cfg.track[t];
         p->lfo[t] = cfg.lfo[t];
     }
+    for (int i = 0; i < PROJ_NAME_LEN; i++) p->name[i] = cfg.name[i];
 }
 
 /* PROJECT-001: new project = declared defaults in the workspace; no slot is
@@ -668,8 +703,12 @@ static void handle_events(void)
                 project_new();
             } else {
                 project_mode = !project_mode;
-                if (project_mode) project_rescan();
-                else project_report(-1, 0);
+                if (project_mode) {
+                    project_rescan();
+                    name_cursor = 0;
+                } else {
+                    project_report(-1, 0);
+                }
             }
             continue;
         case SW_TRACK_A: if (!project_mode) select_track(0, panel_down(SW_SHIFT)); continue;
@@ -698,8 +737,10 @@ static void handle_events(void)
                 }
     }
     if (project_mode) {
-        /* Pads are slot selectors here; drop encoder motion so it does not
-         * accumulate and edit the workspace invisibly. */
+        /* Param 2 and Param 3 edit the project name (stock layout: character
+         * at the cursor / cursor position); the other encoders' motion is
+         * dropped so it does not accumulate and edit the workspace invisibly. */
+        name_edit(panel_encoder_take(ENC_PARAM2), panel_encoder_take(ENC_PARAM3));
         for (int e = 0; e < ENC_COUNT; e++) panel_encoder_take(e);
         loop_revalidate(); /* a loaded or new project may move pattern ends */
         return;
@@ -956,7 +997,14 @@ static void draw_projects(void)
 {
     fb_clear();
     fb_text(2, 1, "PROJECTS", 15);
-    if (project_report_active()) draw_report(120, 1);
+    /* The workspace name with the editor cursor, as in stock firmware's save
+     * flow: a dim baseline under the field, a bright underline at the cursor. */
+    fb_fill(56, 9, PROJ_NAME_LEN * 6 - 1, 1, 3);
+    for (int i = 0; i < PROJ_NAME_LEN; i++)
+        fb_text(56 + i * 6, 1, (const char[]){cfg.name[i], 0},
+                i == name_cursor ? 15 : 10);
+    fb_fill(56 + name_cursor * 6, 9, 5, 1, 15);
+    if (project_report_active()) draw_report(140, 1);
     fb_text(2, 12, "PAD LOAD", 8);
     fb_text(68, 12, "SHIFT+PAD SAVE", 8);
     fb_text(166, 12, "REC+PAD DELETE", 8);
@@ -979,7 +1027,7 @@ static void draw_projects(void)
             if (slot == cur_slot) fb_fill(x, y, 12, 1, 15);
         }
     }
-    fb_text(2, 57, "SHIFT+PROJ NEW  PROJ EXIT", 5);
+    fb_text(2, 57, "SHIFT+PROJ NEW  PROJ EXIT  NAME P2 P3", 5);
     display_flush();
 }
 

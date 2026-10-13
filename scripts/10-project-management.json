@@ -49,6 +49,33 @@
       "ms": 2000
     },
     {
+      "type": "encoder",
+      "control": "param2",
+      "delta": -4
+    },
+    {
+      "type": "wait",
+      "ms": 800
+    },
+    {
+      "type": "encoder",
+      "control": "param3",
+      "delta": 1
+    },
+    {
+      "type": "wait",
+      "ms": 800
+    },
+    {
+      "type": "encoder",
+      "control": "param2",
+      "delta": -10
+    },
+    {
+      "type": "wait",
+      "ms": 1500
+    },
+    {
       "type": "button",
       "control": "shift",
       "down": true

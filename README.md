@@ -113,6 +113,7 @@ mode starts) are honored regardless of the splash.
 | Param 1–4 encoders | SEQ: pulses, length, rotation, note · LFO: waveform, rate, depth, phase — or the active edit mode's parameters |
 | GLOBAL | Commit settings to SPI flash |
 | PROJECT | Open / close the project manager (pads become the 64 slots) |
+| Param 2 / Param 3 encoders (project manager) | Edit the [project name](#projects): character at the cursor / cursor position |
 | SHIFT + PROJECT | New project: reset the workspace to the declared defaults |
 | Power button | Save and shut down |
 
@@ -157,18 +158,33 @@ track's engine selection **and** both of its engine configurations — the
 sequencer parameters (pulses, length, rotation, note, gate, velocity, mod
 level) and the LFO
 parameters (waveform, rate division, depth, phase, CC number, destinations) —
-plus the tempo and swing. Loading a project therefore restores a track in
+plus the tempo, swing and a 12-character name. Loading a project therefore
+restores a track in
 either mode with the other engine's setup intact behind the toggle. The
 edited-track selection stays in the settings sector. The 64 saved-project
 slots follow the spec's documented catalog at SPI `0xC0000 + n × 0x3D000`;
 this firmware's record occupies the first 4 KiB sector of its slot (magic
-`AGP2`, FNV-1a checked) and the rest of the slot region is never written.
+`AGP3`, FNV-1a checked) and the rest of the slot region is never written.
+(Records from builds before names, magic `AGP2`, are reported `INVALID`.)
 
 Press **PROJECT** to open the project manager. The 64 pads become the 64
 slots (bank A pad 1 = slot A1 … bank D pad 16 = slot D16), lit when populated
-and blinking for the current slot; the display shows the catalog grid and a
+and blinking for the current slot; the display shows the workspace name, the
+catalog grid and a
 status line that reports every operation. Both engines keep running
 throughout — browsing slots silences nothing.
+
+The project name is edited here, the way stock firmware's save flow does it:
+the **Param 3** encoder moves the cursor (a bright underline on the name,
+over a dim baseline) and the **Param 2** encoder steps the character at the
+cursor through the character list — space, `A`–`Z`, `0`–`9`, then
+`!?#$%&'()*+,-./:;<=>@` (the stock order, reduced to what the uppercase 5×7
+font renders distinctly) — both clamped at their ends without wraparound.
+Names are a fixed 12 characters, space padded; a new project (and a first
+boot) is named `INIT PROJECT`, as in stock. The name is workspace data like
+any other edit: saved into the slot's record by SHIFT+pad, restored by a
+load, reset by SHIFT+PROJECT, and committed with the settings by GLOBAL or
+the power button.
 
 - **Pad** — load that slot into the workspace. An empty or invalid slot is
   reported (`EMPTY` / `INVALID`) and the workspace is not changed.
@@ -266,12 +282,13 @@ make smoke      # 2M instructions, report in build/smoke.json
   lane), bar selection windowing the 64-step pattern space, and the loop
   (pinned playback, clearing, refusal on an LFO lane and beyond the pattern
   bounds) — MIDI note and CC output,
-  transport, GLOBAL commit, the full project lifecycle (save to first and
-  last slots with untouched-slot and settings guards, new-project defaults
-  without flash writes, exact load-back of both engine modes,
-  empty/corrupt-slot rejection with the workspace unchanged, delete to an
-  observably empty slot), power-button shutdown, and settings plus
-  saved-project persistence across a cold restart.
+  transport, GLOBAL commit, the full project lifecycle (the encoder name
+  editor driven closed-loop against the rendered name field, save to first
+  and last slots with untouched-slot and settings guards, new-project
+  defaults without flash writes, exact load-back of both engine modes
+  including the name, empty/corrupt-slot rejection with the workspace
+  unchanged, delete to an observably empty slot), power-button shutdown, and
+  settings plus saved-project persistence across a cold restart.
 
 ## Storage map
 
@@ -279,8 +296,8 @@ make smoke      # 2M instructions, report in build/smoke.json
 | --- | --- |
 | Internal flash 0x00200000 + 64 KiB | This firmware (VSB payload 0x00000) |
 | SPI 0x00000–0x30000 | Installed-image regions; written only by the updater during a host-initiated installation |
-| SPI 0x40000 (one 4 KiB sector) | Committed settings (magic `AGG2`, FNV-1a checked); rewritten only when contents change |
-| SPI 0xC0000 + n × 0x3D000 (first 4 KiB sector of each of the 64 documented slots) | Saved projects (magic `AGP2`, FNV-1a checked); written only by the explicit save and delete operations |
+| SPI 0x40000 (one 4 KiB sector) | Committed settings (magic `AGG3`, FNV-1a checked); rewritten only when contents change |
+| SPI 0xC0000 + n × 0x3D000 (first 4 KiB sector of each of the 64 documented slots) | Saved projects (magic `AGP3`, FNV-1a checked); written only by the explicit save and delete operations |
 | Everything else | Never written |
 
 ## Provenance

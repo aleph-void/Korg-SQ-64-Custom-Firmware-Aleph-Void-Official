@@ -16,9 +16,11 @@
  * Both engines hang off one shared 24 PPQN transport position, advanced by
  * the internal tempo clock or following incoming MIDI clock automatically,
  * so sequencer steps and LFO phases stay locked to the same beat. Pads and
- * the param encoders edit whichever engine the selected track runs, GLOBAL
- * commits settings to SPI flash, and the power button saves and shuts down
- * cleanly.
+ * the param encoders edit whichever engine the selected track runs, and the
+ * display shows that engine — the active program — alone; tracks running the
+ * other engine are only tagged, never drawn in their own idiom alongside it.
+ * GLOBAL commits settings to SPI flash, and the power button saves and shuts
+ * down cleanly.
  *
  * The spec's panel-key requirements (TRACK/MODE/LOOP/BAR-001): the PITCH,
  * GATE, MOD and CONTROL keys each toggle an edit mode that scopes the pads
@@ -1060,13 +1062,20 @@ static void draw_ui(void)
         fb_text(250, 12, cfg.selected == 3 ? "T" : "G", c->dest & DEST_GATE ? 15 : 3);
     }
 
-    /* One lane per track, drawn in its engine's own idiom. */
+    /* The lane area shows the active program only: the selected track's
+     * engine. A track running the other engine still runs (and keeps its pad
+     * LED feedback) but is listed here with just a dim tag, so the screen is
+     * never a mix of both engines' idioms. */
     for (int t = 0; t < 4; t++) {
         int y = 24 + t * 8;
         uint8_t bright = t == cfg.selected ? 15 : 6;
         fb_text(2, y, (const char[]){(char)('A' + t), 0}, bright);
         fb_text(10, y, cfg.mode[t] == MODE_SEQ ? "S" : "L", 5);
-        if (cfg.mode[t] == MODE_SEQ) draw_seq_lane(t, y);
+        if ((cfg.mode[t] == MODE_SEQ) != seq) {
+            fb_text(24, y, cfg.mode[t] == MODE_SEQ ? "SEQ" : "LFO", 3);
+            continue;
+        }
+        if (seq) draw_seq_lane(t, y);
         else draw_lfo_lane(t, y);
     }
     if (!seq) draw_wave_preview(222, 26, 32, 28, cfg.selected);

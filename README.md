@@ -187,9 +187,13 @@ slots whose region physically fits: on the native emulator's 1 MiB model one
 slot is available, on the 16 MiB browser model (and the presumed real part)
 all 64; out-of-range slots report `NO SLOT` and are never addressed.
 
-The second display line and the param encoders always follow the selected
-track's engine; each lane row renders in its own idiom (pattern cells with a
-playhead, or wave/rate/CC with a live level bar).
+The display and the param encoders always follow the selected track's engine
+— the **active program**. Only that engine's lanes are drawn (pattern cells
+with a playhead on a sequencer program, wave/rate/CC with a live level bar on
+an LFO program); a track running the other engine keeps playing and keeps its
+pad-LED feedback, but its display row is just a dim `SEQ`/`LFO` tag until a
+track of that engine is selected. The screen is never a mix of both engines'
+idioms.
 
 ## Build
 
@@ -211,8 +215,9 @@ filling unused payload with 0xFF and balancing the four region checksums.
 
 Browser workbench (recommended): in `../../emulator/web`, `npm ci && npm run
 dev`, open the printed URL, load `build/aleph-void-custom-fw.vsb` in **Browser
-emulator**, and run. The LFO lanes animate from the moment the panel comes
-up; press PLAY to add the Euclidean lanes. Importable demo scripts for the
+emulator**, and run. The C/D pad rows animate as LFO level bars from the
+moment the panel comes up (select track C or D to bring the LFO program onto
+the display); press PLAY to run the Euclidean lanes. Importable demo scripts for the
 workbench's **UI scripts** panel live in [`scripts/`](scripts/README.md);
 they walk through every major function (mixed-engine transport, editing both
 engine types, the edit modes with bar selection and the loop, the

@@ -823,7 +823,33 @@ static void update_leds(void)
     uint32_t base = (uint32_t)edit_bar * 16; /* pads window the selected bar */
     for (int t = 0; t < 4; t++) {
         uint32_t cols;
-        if (cfg.mode[t] == MODE_SEQ) {
+        /* Inside an edit mode a row's pads edit one parameter, so the row's
+         * LEDs show that parameter instead of the pattern: the one lit pad is
+         * the pad whose press sets the track's current value (dark when the
+         * value lies off the pad scale, e.g. an encoder-set note outside
+         * 36..51). Rows whose pads are documented inert in the mode (LFO
+         * lanes outside PITCH) keep their normal view. */
+        bool mode_view = false;
+        if (edit_mode != EDIT_NONE) {
+            if (cfg.mode[t] == MODE_SEQ) {
+                const track_cfg_t *c = &cfg.track[t];
+                int pad;
+                switch (edit_mode) {
+                case EDIT_PITCH:   pad = c->note - 36;          break;
+                case EDIT_GATE:    pad = (c->gate_pct - 5) / 6; break;
+                case EDIT_MOD:     pad = c->mod;                break;
+                default:           pad = c->velocity >> 3;      break;
+                }
+                cols = (pad >= 0 && pad < 16) ? 2u << pad : 0;
+                mode_view = true;
+            } else if (edit_mode == EDIT_PITCH) {
+                cols = 2u << (cfg.lfo[t].phase & 15);
+                mode_view = true;
+            }
+        }
+        if (mode_view) {
+            /* cols already holds the mode view */
+        } else if (cfg.mode[t] == MODE_SEQ) {
             const track_cfg_t *c = &cfg.track[t];
             cols = (uint32_t)((track_pattern(t) >> base) & 0xffffu) << 1;
             if (playing) {
@@ -1132,6 +1158,11 @@ static void normal_main(void)
     for (;;) {
         panel_poll();
         handle_events();
+        /* handle_events can run long (storage operations); drain the scan
+         * again so the stretch through the engines and LED render below
+         * never spans more than a scan half-buffer, where a replayed stale
+         * half can double a button edge. */
+        panel_poll();
         midi_poll();
         if (rt_start) { rt_start = false; transport_start(); }
         if (rt_stop) { rt_stop = false; transport_stop(); }
@@ -1142,7 +1173,9 @@ static void normal_main(void)
         }
         sequencer_tick();
         lfo_update();
+        panel_poll(); /* and again on both sides of the LED render */
         update_leds();
+        panel_poll();
         if ((int32_t)(g_ms - last_draw_ms) >= 40) {
             last_draw_ms = g_ms;
             draw_ui(); /* LFO lanes animate: redraw on a fixed cadence */

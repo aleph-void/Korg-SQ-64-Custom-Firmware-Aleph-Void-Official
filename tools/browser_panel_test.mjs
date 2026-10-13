@@ -138,6 +138,7 @@ check(bOn === 7, `track B shows 7 pulses on LEDs (got ${bOn})`);
 
 // Param1 (pulses) encoder turns track B down to 5 pulses.
 const bPulses = () => Array.from({length: 16}, (_, i) => machine.board.panel.leds['B' + (i + 1)] > 128).filter(Boolean).length;
+const litPads = row => Array.from({length: 16}, (_, i) => machine.board.panel.leds[row + (i + 1)] > 128 ? i + 1 : 0).filter(Boolean);
 const bAfter = turnTo('param1', bPulses, 5);
 check(bAfter === 5, `pulses encoder reduced track B to 5 pulses (got ${bAfter})`);
 
@@ -197,17 +198,27 @@ const writesBeforeModes = machine.board.flash.writes;
 press('pitch');
 check(machine.board.panel.leds.pitch > 128, 'PITCH mode LED lit');
 press('B8'); // note 43 (G2)
+check(litPads('B').join() === '8',
+  `PITCH mode pad row shows the note pad (lit: ${litPads('B')})`);
+check(litPads('A').join() === '1',
+  'PITCH mode shows LFO A phase (0) on its pad row');
 press('pitch');
 check(machine.board.panel.leds.pitch < 64, 'second press leaves PITCH mode');
 press('control');
 press('B16'); // velocity 127
+check(litPads('B').join() === '16',
+  `CONTROL mode pad row shows the velocity pad (lit: ${litPads('B')})`);
 press('control');
 press('gate');
 press('B15'); // gate 89 % of a step
+check(litPads('B').join() === '15',
+  `GATE mode pad row shows the gate pad (lit: ${litPads('B')})`);
 press('gate');
 press('mod');
 check(machine.board.panel.leds.mod > 128, 'MOD mode LED lit');
 press('B16'); // mod level 15 (full scale)
+check(litPads('B').join() === '16',
+  `MOD mode pad row shows the mod pad (lit: ${litPads('B')})`);
 press('mod');
 check(bPulses() === 5, 'mode edits left the pattern pulses alone');
 check(machine.board.flash.writes === writesBeforeModes,

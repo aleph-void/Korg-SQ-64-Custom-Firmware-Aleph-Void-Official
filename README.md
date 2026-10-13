@@ -46,7 +46,8 @@ other lanes; per-track note, gate length, mod CV level and velocity; swing
 50–75 % across all sequencer lanes. Lanes A/B/C drive their gate jack, pitch
 CV, mod CV and MIDI notes on channels 1–3; lane D drives trigger jack 1 and
 MIDI channel 10. Pad LEDs show the selected bar of the pattern with a moving
-playhead.
+playhead (outside the [edit modes](#edit-modes), which repaint the rows with
+the edited parameter).
 
 **LFO lane** (per track in LFO mode): six waveforms — sine, triangle, rise,
 fall, square, sample & hold — sixteen synced rate divisions from 8 bars to
@@ -55,7 +56,8 @@ MIDI CC number streamed on channels 1–4 (USB and DIN, rate-limited, sent only
 on change). LFOs A/B/C can drive their mod CV, pitch CV and gate jacks
 (gate = square-thresholded LFO), routed inside the PITCH / GATE / MOD edit
 modes; LFO D pulses trigger jack 1 once per cycle. Pad LEDs are a live level
-bar and the display shows a waveform preview with a phase cursor.
+bar (in the PITCH edit mode, the phase-offset pad) and the display shows a
+waveform preview with a phase cursor.
 
 **The spec's panel-key requirements** (TRACK/MODE/LOOP/BAR/TAP/TEMPO/
 SWING-001): A–D select the edited track; the PITCH, GATE, MOD and CONTROL
@@ -125,10 +127,16 @@ inside the edit modes — has no effect.
 The PITCH, GATE, MOD and CONTROL keys each toggle a documented edit mode
 over the normal surface (spec MODE-001). The active mode is reported on its
 key LED and named on the display; pressing the same key leaves, pressing a
-different mode key switches directly. Entering or leaving a mode changes no
-pattern, workspace or settings data, and all edits inside a mode go to that
-mode's documented parameters on the selected track only. What a mode edits
-follows the selected track's engine:
+different mode key switches directly. The pad LEDs follow the mode too:
+every row whose pads edit a parameter in the mode (sequencer rows in all
+four modes, LFO rows in PITCH) lights the single pad whose press sets that
+track's current value — dark when the value lies off the pad scale, such as
+an encoder-set note outside the pads' 36–51 range — while rows whose pads
+are inert in the mode (LFO rows in GATE/MOD/CONTROL) keep their live level
+bar. Leaving the mode restores the pattern/playhead view. Entering or
+leaving a mode changes no pattern, workspace or settings data, and all edits
+inside a mode go to that mode's documented parameters on the selected track
+only. What a mode edits follows the selected track's engine:
 
 | Mode | Sequencer lane (pads 1–16) | LFO lane (Param 1 / Param 2 / pads) |
 | --- | --- | --- |

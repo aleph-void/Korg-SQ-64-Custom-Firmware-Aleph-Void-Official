@@ -1,5 +1,7 @@
 # AV aggregate — original SQ-64 firmware
 
+[![Sponsor Aleph Void](https://img.shields.io/badge/Sponsor-Aleph%20Void-EA4AAA?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/aleph-void)
+
 A from-scratch firmware for the Korg SQ-64 hardware sequencer that aggregates
 both Aleph Void firmware feature sets into one image: each of the four tracks
 runs either a **Euclidean rhythm sequencer** lane (as in the sibling
